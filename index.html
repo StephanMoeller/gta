@@ -1,0 +1,110 @@
+<html>
+
+<head>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+    <meta content="utf-8" http-equiv="encoding">
+
+    <script src="Assert.js?nocache=true"></script>
+    <script src="gfxUtils.js?nocache=true"></script>
+    <script src="gameUtils.js?nocache=true"></script>
+</head>
+
+<body>
+    <div>Paint: <span id="paintCounter"></span>ms</div>
+    <div>Collision: <span id="collisionCounter"></span>ms</div>
+    <div>Collision: <span id="collisionDetected"></span></div>
+    <div style="position: relative;">
+        <canvas id="canvas_buildings" style="border: solid 1px red; position: absolute" width="1200" height="800"></canvas>
+        <canvas id="canvas_player" style="border: solid 1px red; position: absolute" width="1200" height="800"></canvas>
+    </div>
+
+    Hello 2
+    <script>
+        var WIDTH = 1200;
+        var HEIGHT = 800;
+        var checkCollision = function (imgData, { x, y }) {
+            var pixelColor = GfxUtils.getPixel(imgData, { x: x, y: y });
+            return pixelColor.a > 0;
+        }
+
+        var measure = function (action, idOfCounter) {
+            var start = new Date();
+            action();
+            var elapsed = new Date() - start;
+            document.getElementById(idOfCounter).innerText = parseInt(elapsed);
+        };
+
+        var start = async function () {
+
+            var player = await GameUtils.createCarAsync({ carImgPath: "car_white.png" });
+            var enemy = await GameUtils.createCarAsync({ carImgPath: "car_orange.png" });
+
+            enemy.sprite.x = 100;
+            enemy.sprite.y = 500;
+
+            var buildingsGfxInfo = GfxUtils.loadGfxInfo(document.getElementById("canvas_buildings"));
+
+            // Buildings
+            GfxUtils.paintSquare(buildingsGfxInfo.imgData, { x: 100, y: 150, width: 100, height: 300 }, { r: 100, g: 100, b: 100, a: 255 });
+            buildingsGfxInfo.context.putImageData(buildingsGfxInfo.imgData, 0, 0);
+
+            // Car
+            var centerX = 0;
+            var centerY = 0;
+            var playerGfx = GfxUtils.loadGfxInfo(document.getElementById("canvas_player"));
+            var repaintCars = function () {
+                // Clear car layer and get clean imageData
+                playerGfx.context.clearRect(0, 0, WIDTH, HEIGHT);
+                var imgData = playerGfx.context.getImageData(0, 0, WIDTH, HEIGHT);
+
+                // Paint player and enemies
+                enemy.sprite.paintOnImgData({ imgData: imgData });
+                player.sprite.paintOnImgData({ imgData: imgData });
+
+                // Finally set the image data back on the layer
+                playerGfx.context.putImageData(imgData, 0, 0);
+            }
+
+            var lastTick = new Date();
+            var tick = function () {
+                var newTick = new Date();
+                var deltaMs = newTick - lastTick;
+                lastTick = newTick;
+                Assert.defined([deltaMs]);
+                player.update({deltaMs: deltaMs});
+
+                enemy.addDirection({ deltaRotDegrees: -1 });
+
+                measure(() => {
+                    repaintCars();
+                }, "paintCounter");
+
+                measure(() => {
+                    while(player.sprite.checkCollisionWithSprite({ otherSprite: enemy.sprite }) || player.sprite.checkCollisionWithImgData({ imgData: buildingsGfxInfo.context.getImageData(0, 0, WIDTH, HEIGHT) })){
+                        player.rewindALittle();
+                    }
+                }, "collisionCounter");
+            }
+            setInterval(tick, 20);
+
+
+            var lastCollosion = null;
+
+            var controlsListener = window;
+            
+            controlsListener.addEventListener("keydown", function (e) {
+                player.pressKey({e});
+            });
+            controlsListener.addEventListener("keyup", function (e) {
+                player.releaseKey({e});
+            });
+
+        };
+        start();
+
+
+
+    </script>
+</body>
+
+</html>
